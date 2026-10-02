@@ -1,0 +1,9 @@
+node_modules/
+nPM_debug.log
+npm-debug-*.log
+.DS_Store
+.VS_code/
+*.report.json
+.npmr
+coverage/
+.npmtoteok
