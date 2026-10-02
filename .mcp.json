@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "reviewpilot": {
+      "command": "npx",
+      "args": ["-y", "reviewpilot-mcp"],
+      "env": {
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
+        "REVIEW_MODEL": "${REVIEW_MODEL}"
+      }
+    }
+  }
+}

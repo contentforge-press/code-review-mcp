@@ -1,6 +1,6 @@
 {
   "name": "reviewpilot-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "AI-powered code review MCP server for automated PR analysis",
   "main": "index.js",
   "type": "module",
@@ -30,5 +30,12 @@
   },
   "bin": {
     "reviewpilot-mcp": "index.js"
-  }
+  },
+  "files": [
+    "index.js",
+    ".mcp.json",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ]
 }
