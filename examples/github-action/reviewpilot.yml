@@ -1,0 +1,38 @@
+# Automatic pull request review with ReviewPilot CLI.
+# Save as .github/workflows/reviewpilot.yml and set OPENAI_API_KEY
+# (optional: OPENAI_BASE_URL and/or REVIEW_MODEL) in repository secrets.
+name: ReviewPilot PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate diff
+        run: git diff "origin/${{ github.base_ref }}...HEAD" > pr.diff
+
+      - name: Review with ReviewPilot
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          REVIEW_MODEL: ${{ secrets.REVIEW_MODEL }}
+        run: npx -y reviewpilot-mcp --review pr.diff --context "PR #${{ github.event.pull_request.number }}" > review.md
+
+      - name: Post review comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: review.md

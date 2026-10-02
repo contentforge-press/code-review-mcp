@@ -141,3 +141,32 @@ ContentForge Press
 
 - GitHub Issues: https://github.com/contentforge-press/code-review-mcp/issues
 - Email: support@contentforge.press
+
+## CLI mode (CI-friendly)
+
+Run a one-shot review without an MCP client:
+
+```bash
+# Review a diff file
+reviewpilot-mcp --review pr.diff
+
+# With context
+reviewpilot-mcp --review pr.diff --context "PR #123: auth feature"
+
+# Security scan a source file
+reviewpilot-mcp --security src/app.js --language javascript
+```
+
+### GitHub Actions automatic PR review
+
+Copy [`examples/github-action/reviewpilot.yml`](examples/github-action/reviewpilot.yml) to `.github/workflows/`. Every PR gets an automated review comment.
+
+## Configuration
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `OPENAI_API_KEY` | yes | — | API key |
+| `OPENAI_BASE_URL` | no | OpenAI | Any OpenAI-compatible endpoint (gateways, local servers) |
+| `REVIEW_MODEL` | no | `gpt-4o-mini` | Model used for review |
+
+Use a local or cheaper model by pointing `OPENAI_BASE_URL` and `REVIEW_MODEL` at an OpenAI-compatible server.

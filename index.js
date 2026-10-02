@@ -8,10 +8,16 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import OpenAI from "openai";
 
-// Initialize OpenAI client (requires OPENAI_API_KEY environment variable)
+// Initialize LLM client. Supports OpenAI and any OpenAI-compatible endpoint
+// (e.g. local servers, gateways). Configure via environment:
+//   OPENAI_API_KEY   - API key (required)
+//   OPENAI_BASE_URL  - override base URL (optional, default OpenAI)
+//   REVIEW_MODEL     - model name (optional, default gpt-4o-mini for lower cost)
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || "dummy",
+  ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}),
 });
+const REVIEW_MODEL = process.env.REVIEW_MODEL || "gpt-4o-mini";
 
 // Code review prompt template
 const REVIEW_PROMPT = `You are an expert code reviewer. Analyze the following code changes and provide:
@@ -30,7 +36,7 @@ class CodeReviewServer {
   constructor() {
     this.server = new Server(
       {
-        name: "code-review-mcp",
+        name: "reviewpilot-mcp",
         version: "1.0.0",
       },
       {
@@ -143,7 +149,7 @@ class CodeReviewServer {
       : prompt;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: REVIEW_MODEL,
       messages: [
         {
           role: "system",
@@ -184,7 +190,7 @@ Code:
 ${code}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: REVIEW_MODEL,
       messages: [
         {
           role: "system",
@@ -230,7 +236,7 @@ Code:
 ${code}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: REVIEW_MODEL,
       messages: [
         {
           role: "system",
@@ -264,6 +270,72 @@ ${code}`;
   }
 }
 
-// Start the server
-const server = new CodeReviewServer();
-server.run().catch(console.error);
+// ---------------------------------------------------------------------------
+// CLI mode: run a one-shot review outside of MCP.
+//   reviewpilot-mcp --review <diffFile> [--context "..."]
+//   reviewpilot-mcp --security <codeFile> [--language js]
+// Prints plain text to stdout; ideal for CI and pre-commit hooks.
+async function runCli(argv){
+  const args = argv.slice(2);
+  function valueAfter(flag){
+    const i = args.indexOf(flag);
+    return i >= 0 ? args[i+1] : undefined;
+  }
+  const fs = await import("node:fs");
+
+  if(args.includes("--review")){
+    const file = valueAfter("--review");
+    const diff = fs.readFileSync(file, "utf8");
+    const context = valueAfter("--context") || "";
+    const out = await reviewpilotReview(diff, context);
+    process.stdout.write(out + "\n");
+  } else if(args.includes("--security")){
+    const file = valueAfter("--security");
+    const code = fs.readFileSync(file, "utf8");
+    const language = valueAfter("--language") || "unknown";
+    const out = await reviewpilotSecurity(code, language);
+    process.stdout.write(out + "\n");
+  } else {
+    process.stderr.write("Usage: reviewpilot-mcp --review <diffFile> [--context ...]\n");
+    process.exit(2);
+  }
+}
+
+// Standalone text-returning wrappers (used by both CLI and MCP tools)
+async function reviewpilotReview(diff, context){
+  const prompt = REVIEW_PROMPT.replace("%s", diff);
+  const fullPrompt = context ? prompt + "\n\nAdditional context: " + context : prompt;
+  const response = await openai.chat.completions.create({
+    model: REVIEW_MODEL,
+    messages: [
+      { role: "system", content: "You are an expert code reviewer. Provide concise, actionable feedback." },
+      { role: "user", content: fullPrompt }
+    ],
+    temperature: 0.3,
+    max_tokens: 1500
+  });
+  return response.choices[0].message.content;
+}
+
+async function reviewpilotSecurity(code, language){
+  const prompt = "Analyze the following " + language + " code for security vulnerabilities.\nCode:\n" + code;
+  const response = await openai.chat.completions.create({
+    model: REVIEW_MODEL,
+    messages: [
+      { role: "system", content: "You are a security expert. Identify potential security vulnerabilities." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.2,
+    max_tokens: 1000
+  });
+  return response.choices[0].message.content;
+}
+
+// Entry: CLI flags win; otherwise start the MCP server.
+if(process.argv.slice(2).length > 0){
+  runCli(process.argv).catch((e)=>{ process.stderr.write("Error: " + e.message + "\n"); process.exit(1); });
+} else {
+  const server = new CodeReviewServer();
+  server.run().catch(console.error);
+}
+
